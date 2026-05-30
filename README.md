@@ -1,17 +1,25 @@
-仅供学习!!!
 # 工业级分块下载系统
 
 一个生产级别的 **大文件分块下载工具**，支持 SHA256 哈希校验、多线程并行处理、断点续传。
+
+---
 
 ## 📋 目录
 
 - [功能特性](#-功能特性)
 - [快速开始](#-快速开始)
+- [部署指南](#-部署指南)
+  - [方式1：本地测试](#方式1本地测试)
+  - [方式2：Docker部署](#方式2docker部署推荐)
+  - [方式3：手动部署](#方式3手动部署)
+  - [方式4：自动化部署](#方式4自动化部署)
 - [使用方法](#-使用方法)
 - [架构设计](#-架构设计)
 - [API文档](#api文档)
 - [配置文件格式](#配置文件格式)
 - [常见问题](#常见问题)
+
+---
 
 ## ✨ 功能特性
 
@@ -30,47 +38,206 @@
 - ⚙️ **可配置**：分块大小、线程数、超时时间均可配置
 - 📝 **详细日志**：分级日志记录，便于调试
 
+---
+
 ## 🚀 快速开始
 
-### 1. 安装
+### 方式1：本地测试
 
 ```bash
 # 克隆项目
-git clone https://github.com/TC-STA/chunk-download-system.git
-cd chunk-download-system
+git clone https://github.com/TC-STA/industrial-chunk-download-system.git
+cd industrial-chunk-download-system
 
-# 无需安装！Python 3.6+ 内置库即可运行
+# 服务端分块
+python3 server.py 你的大文件.zip --chunk-size 32MB -o dist
+
+# 本地合并测试
+python3 client.py --local ./dist/config.json -o 恢复的文件.zip
 ```
 
-### 2. 服务端分块
+### 方式2：Docker部署（推荐⭐）
 
 ```bash
-# 基本用法 - 将文件分块
-python3 server.py game.zip
+# 克隆项目
+git clone https://github.com/TC-STA/industrial-chunk-download-system.git
+cd industrial-chunk-download-system
 
-# 指定分块大小
-python3 server.py movie.mp4 --chunk-size 64MB
+# 一键启动
+docker-compose up -d
 
-# 指定输出目录和线程数
-python3 server.py large.iso -s 32MB -o dist -w 8
+# 访问
+http://localhost:8080
 ```
 
-### 3. 客户端下载
+### 方式3：手动部署
 
 ```bash
-# 从 HTTP 服务器下载
-python3 client.py http://example.com/chunks/config.json -o game.zip
+# 1. 安装依赖
+sudo apt update
+sudo apt install python3 nginx
 
-# 从本地分块合并
-python3 client.py --local ./chunks/config.json -o restored.zip
+# 2. 分块文件
+python3 server.py 大文件.zip --chunk-size 32MB -o /var/www/chunks
+
+# 3. 配置 Nginx
+sudo cp nginx.conf /etc/nginx/sites-available/chunks
+sudo ln -s /etc/nginx/sites-available/chunks /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
 ```
 
-### 4. 运行演示
+### 方式4：自动化部署
 
 ```bash
-# 运行完整演示
-python3 test_demo.py
+# 给脚本加执行权限
+chmod +x 部署脚本.sh
+
+# 运行一键部署
+./部署脚本.sh
 ```
+
+---
+
+## 🚀 部署指南
+
+### 架构图
+
+```
+                    ┌─────────────────┐
+                    │   用户客户端     │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │  Nginx/Web服务器 │
+                    │   (端口 80/8080) │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+        ┌─────────┐  ┌──────────┐  ┌──────────┐
+        │ config  │  │ chunk.0  │  │ chunk.N  │
+        │  .json  │  │          │  │          │
+        └─────────┘  └──────────┘  └──────────┘
+              ← 分块文件目录 (可挂载) →
+```
+
+### 方式1：本地测试
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/TC-STA/industrial-chunk-download-system.git
+cd industrial-chunk-download-system
+
+# 2. 服务端分块
+python3 server.py test.zip --chunk-size 1MB -o test_chunks
+
+# 3. 本地合并测试
+python3 client.py --local ./test_chunks/config.json -o test_restored.zip
+
+# 4. 验证哈希
+md5sum test.zip test_restored.zip
+```
+
+### 方式2：Docker部署（推荐⭐）
+
+**前置条件**：安装 Docker 和 Docker Compose
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/TC-STA/industrial-chunk-download-system.git
+cd industrial-chunk-download-system
+
+# 2. 创建数据目录
+mkdir -p data
+
+# 3. 放入要分块的文件
+cp your_large_file.zip data/
+
+# 4. 启动服务
+docker-compose up -d
+
+# 5. 分块文件（在容器内）
+docker-compose exec web python3 server.py /var/www/chunks/your_large_file.zip --chunk-size 32MB -o /var/www/chunks/files
+
+# 6. 访问下载
+# http://你的服务器IP:8080/files/config.json
+# http://你的服务器IP:8080/files/your_large_file.zip.part00000
+```
+
+**客户端下载命令**：
+```bash
+python3 client.py http://服务器IP:8080/files/config.json -o downloaded.zip
+```
+
+### 方式3：手动部署
+
+#### 步骤1：准备服务器
+
+```bash
+# 安装 Python 和 Nginx
+sudo apt update
+sudo apt install python3 python3-pip nginx
+
+# 创建目录
+sudo mkdir -p /var/www/chunks
+sudo chown -R $USER:$USER /var/www/chunks
+```
+
+#### 步骤2：分块文件
+
+```bash
+cd industrial-chunk-download-system
+
+# 分块大文件
+python3 server.py /path/to/your_file.zip --chunk-size 32MB -o /var/www/chunks/files
+```
+
+#### 步骤3：配置 Nginx
+
+```bash
+# 复制配置
+sudo cp nginx.conf /etc/nginx/sites-available/chunks
+
+# 启用站点
+sudo ln -sf /etc/nginx/sites-available/chunks /etc/nginx/sites-enabled/chunks
+
+# 测试配置
+sudo nginx -t
+
+# 重启 Nginx
+sudo systemctl restart nginx
+```
+
+#### 步骤4：配置防火墙
+
+```bash
+# 开放 80 端口
+sudo ufw allow 80
+sudo ufw allow 443  # 如果用 HTTPS
+```
+
+### 方式4：自动化部署
+
+```bash
+# 克隆项目
+git clone https://github.com/TC-STA/industrial-chunk-download-system.git
+cd industrial-chunk-download-system
+
+# 运行部署脚本
+chmod +x 部署脚本.sh
+./部署脚本.sh
+```
+
+脚本会引导你完成：
+1. ✅ 检查依赖
+2. ✅ 克隆/更新项目
+3. ✅ 分块文件（可选）
+4. ✅ 启动服务
+
+---
 
 ## 📖 使用方法
 
@@ -121,7 +288,7 @@ python3 client.py <配置> -o <输出文件> [选项]
 **示例**:
 ```bash
 # 从服务器下载
-python3 client.py http://cdn.example.com/game/config.json -o game.exe -w 8
+python3 client.py http://cdn.example.com/chunks/config.json -o game.exe -w 8
 
 # 从本地分块恢复
 python3 client.py --local ./chunks/config.json -o game.exe
@@ -138,6 +305,8 @@ python3 client.py config.json -o output.zip -c my_cache -t 60
 | 100MB - 1GB | 16-32MB | 平衡选择 |
 | 1GB - 10GB | 32-64MB | 大文件，减少分块数量 |
 | > 10GB | 64-128MB | 超大文件，减少管理开销 |
+
+---
 
 ## 🏗 架构设计
 
@@ -214,6 +383,8 @@ with ThreadPoolExecutor(max_workers=self.workers) as executor:
         future = executor.submit(self.download_chunk_with_retry, ...)
 ```
 
+---
+
 ## API文档
 
 ### 服务端 API
@@ -274,6 +445,8 @@ def download(self, config_url: str, output_file: str, chunks_dir: str = 'downloa
 **返回**:
 - 下载是否成功
 
+---
+
 ## 配置文件格式
 
 ### config.json
@@ -295,14 +468,6 @@ def download(self, config_url: str, output_file: str, chunks_dir: str = 'downloa
       "size": 33554432,
       "filename": "game.zip.part00000",
       "hash": "51a75f4634dfa..."
-    },
-    {
-      "index": 1,
-      "start": 33554432,
-      "end": 67108864,
-      "size": 33554432,
-      "filename": "game.zip.part00001",
-      "hash": "084b42f6e95e..."
     }
   ]
 }
@@ -320,6 +485,8 @@ def download(self, config_url: str, output_file: str, chunks_dir: str = 'downloa
 | hash_algorithm | string | 哈希算法 |
 | full_hash | string | 完整文件 SHA256 |
 | chunks | array | 分块信息数组 |
+
+---
 
 ## 常见问题
 
@@ -349,28 +516,33 @@ def download(self, config_url: str, output_file: str, chunks_dir: str = 'downloa
 3. 验证每个分块的哈希
 4. 中断后重新运行即可继续
 
-### Q: 如何部署到生产环境？
+### Q: Docker 部署后如何分块？
 
-**A**: 推荐架构：
+```bash
+# 进入容器
+docker exec -it industrial-chunk-download-system-web-1 /bin/bash
+
+# 在容器内分块
+python3 /app/server.py /var/www/chunks/your_file.zip --chunk-size 32MB -o /var/www/chunks/files
 ```
-                    ┌─────────────┐
-                    │   用户端     │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Web 服务器  │
-                    │  (Nginx)    │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-       ┌──────▼──────┐    │    ┌──────▼──────┐
-       │  分块文件 1  │    │    │  分块文件 N  │
-       └─────────────┘    │    └─────────────┘
-                    ┌──────▼──────┐
-                    │ config.json │
-                    └─────────────┘
+
+### Q: 如何配置 HTTPS？
+
+编辑 `nginx.conf`，添加 SSL 配置：
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    # 其他配置...
+}
 ```
+
+---
 
 ## 📄 许可证
 
@@ -379,3 +551,7 @@ MIT License - 可自由使用、修改和分发。
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+---
+
+**GitHub**: https://github.com/TC-STA/industrial-chunk-download-system
