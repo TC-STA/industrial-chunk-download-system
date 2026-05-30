@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# 测试输出
+test_*.txt
+test_chunks/
+downloads/
+*.part*/
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 日志
+*.log
